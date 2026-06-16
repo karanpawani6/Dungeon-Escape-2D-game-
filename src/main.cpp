@@ -10,6 +10,7 @@
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_primitives.h>
+#include <algorithm>
 using namespace std;
 
 void must_init(bool test, const char* description) {
@@ -104,11 +105,28 @@ int main() {
     al_set_new_display_option(ALLEGRO_SAMPLES, 8, ALLEGRO_SUGGEST);
     al_set_new_bitmap_flags(ALLEGRO_MIN_LINEAR | ALLEGRO_MAG_LINEAR);
 
-    const int screenwidth = 1500;
-    const int screenheight = 800;
+    const int VIRTUAL_WIDTH = 1500;
+    const int VIRTUAL_HEIGHT = 800;
 
-    ALLEGRO_DISPLAY* disp = al_create_display(screenwidth, screenheight);
+    bool fullscreen = true;
+
+    al_set_new_display_flags(ALLEGRO_FULLSCREEN_WINDOW);
+
+    ALLEGRO_DISPLAY* disp = al_create_display(1920, 1080);
     must_init(disp, "display");
+
+    int screenwidth = al_get_display_width(disp);
+    int screenheight = al_get_display_height(disp);
+
+    float scale =
+        min((float)screenwidth / VIRTUAL_WIDTH,
+            (float)screenheight / VIRTUAL_HEIGHT);
+
+    float offsetX =
+        (screenwidth - VIRTUAL_WIDTH * scale) / 2.0f;
+
+    float offsetY =
+        (screenheight - VIRTUAL_HEIGHT * scale) / 2.0f;
 
     ALLEGRO_FONT* font = al_create_builtin_font();
     must_init(font, "font");
@@ -124,7 +142,7 @@ int main() {
 
     initialize_levels();
 
-    player b1(0, screenheight - 133, 101, 133);
+    player b1(0, VIRTUAL_HEIGHT - 133, 101, 133);
 
     Door door(1400, 705);
 
@@ -177,12 +195,12 @@ int main() {
                 for (int i = 0; i < ALLEGRO_KEY_MAX; i++)
                     key[i] &= ~KEY_SEEN;
 
-                b1.updateposition(screenwidth, screenheight,
+                b1.updateposition(VIRTUAL_WIDTH, VIRTUAL_HEIGHT,
                     levels[currentLevel].platforms,
                     levels[currentLevel].coins);
 
                 for (auto& en : enemies) {
-                    en.update(screenwidth, screenheight);
+                    en.update(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
                     if (check_collision(b1, en)) {
                         game_over = true;
                     }
@@ -206,7 +224,7 @@ int main() {
 
                             enemies = levels[currentLevel].enemies;
                         }
-                        b1.reset(0, screenheight - frameH, frameW, frameH);
+                        b1.reset(0, VIRTUAL_HEIGHT - frameH, frameW, frameH);
                     }
                 }
             }
@@ -215,11 +233,46 @@ int main() {
 
         case ALLEGRO_EVENT_KEY_DOWN:
             key[event.keyboard.keycode] = KEY_SEEN | KEY_DOWN;
+
+            if (event.keyboard.keycode == ALLEGRO_KEY_F11)
+            {
+                fullscreen = !fullscreen;
+
+                al_destroy_display(disp);
+
+                if (fullscreen)
+                    al_set_new_display_flags(ALLEGRO_FULLSCREEN_WINDOW);
+                else
+                    al_set_new_display_flags(ALLEGRO_WINDOWED);
+
+                disp = fullscreen
+                    ? al_create_display(1920, 1080)
+                    : al_create_display(1500, 800);
+
+                screenwidth = al_get_display_width(disp);
+                screenheight = al_get_display_height(disp);
+
+                scale =
+                    min((float)screenwidth / VIRTUAL_WIDTH,
+                        (float)screenheight / VIRTUAL_HEIGHT);
+
+                offsetX =
+                    (screenwidth - VIRTUAL_WIDTH * scale) / 2.0f;
+
+                offsetY =
+                    (screenheight - VIRTUAL_HEIGHT * scale) / 2.0f;
+
+                al_register_event_source(
+                    queue,
+                    al_get_display_event_source(disp)
+                );
+            }
+
             if (game_over) {
                 if (event.keyboard.keycode == ALLEGRO_KEY_SPACE) {
                     game_over = false;
                     /*currentLevel = 0;*/
-                    b1.reset(0, screenheight - frameH, frameW, frameH);
+                    b1.reset(0, VIRTUAL_HEIGHT - frameH, frameW, frameH);
                     initialize_levels();
                     enemies = levels[currentLevel].enemies;
                 }
@@ -243,6 +296,24 @@ int main() {
 
         if (redraw && al_is_event_queue_empty(queue)) {
             al_clear_to_color(al_map_rgb(0, 0, 0));
+
+            ALLEGRO_TRANSFORM transform;
+
+            al_identity_transform(&transform);
+
+            al_translate_transform(
+                &transform,
+                offsetX,
+                offsetY
+            );
+
+            al_scale_transform(
+                &transform,
+                scale,
+                scale
+            );
+
+            al_use_transform(&transform);
 
             if (!game_over) {
                 al_draw_bitmap_region(image, frameW * counter, 0,
@@ -274,21 +345,27 @@ int main() {
                 if (currentLevel == levels.size() - 1 &&
                     levels[currentLevel].coins.empty()) {
                     al_draw_text(font, al_map_rgb(0, 255, 0),
-                        screenwidth / 2, screenheight / 2 - 40,
+                        VIRTUAL_WIDTH / 2,
+                        VIRTUAL_HEIGHT / 2 - 40,
                         ALLEGRO_ALIGN_CENTER, "VICTORY!");
                 }
             }
             else {
-                al_draw_filled_rectangle(0, 0, screenwidth, screenheight,
+                al_draw_filled_rectangle(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT,
                     al_map_rgba(0, 0, 0, 200));
                 al_draw_text(font, al_map_rgb(255, 0, 0),
-                    screenwidth / 2, screenheight / 2 - 40,
+                    VIRTUAL_WIDTH / 2,
+                    VIRTUAL_HEIGHT / 2 - 40,
                     ALLEGRO_ALIGN_CENTER, "GAME OVER!");
                 al_draw_text(font, al_map_rgb(255, 255, 255),
-                    screenwidth / 2, screenheight / 2 + 20,
+                    VIRTUAL_WIDTH / 2,
+                    VIRTUAL_HEIGHT / 2 + 20,
                     ALLEGRO_ALIGN_CENTER, "Press SPACE to restart");
             }
+            ALLEGRO_TRANSFORM identity;
 
+            al_identity_transform(&identity);
+            al_use_transform(&identity);
             al_flip_display();
             redraw = false;
         }

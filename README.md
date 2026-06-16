@@ -1,4 +1,4 @@
-# Dungeon Escape 🏰
+# Dungeon Escape 
 
 A 2D platformer game built in C++ using the Allegro 5 library.
 
@@ -12,6 +12,7 @@ A 2D platformer game built in C++ using the Allegro 5 library.
 
 - Arrow keys to move
 - Up arrow to jump
+- F11 to minimze and maximize the screen
 
 ## Built With
 
